@@ -1,0 +1,147 @@
+{
+  "version": "1",
+  "models": [
+    {
+      "name": "tinyllama",
+      "tags": ["1b"],
+      "default_tag": "1b",
+      "tier": "free",
+      "description": "Tiny 1B model, great for testing. Runs on any hardware.",
+      "variants": {
+        "1b": {
+          "hf_repo": "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF",
+          "filename": "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+          "size_gb": 0.67,
+          "ram_required_gb": 2,
+          "checksum": null,
+          "price_sol": 0.0
+        }
+      }
+    },
+    {
+      "name": "qwen2.5-coder",
+      "tags": ["3b", "7b", "14b"],
+      "default_tag": "7b",
+      "tier": "free",
+      "description": "Qwen 2.5 Coder — excellent for coding tasks.",
+      "variants": {
+        "3b": {
+          "hf_repo": "bartowski/Qwen2.5-Coder-3B-Instruct-GGUF",
+          "filename": "Qwen2.5-Coder-3B-Instruct-Q4_K_M.gguf",
+          "size_gb": 2.0,
+          "ram_required_gb": 4,
+          "checksum": null,
+          "price_sol": 0.0
+        },
+        "7b": {
+          "hf_repo": "bartowski/Qwen2.5-Coder-7B-Instruct-GGUF",
+          "filename": "Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf",
+          "size_gb": 4.7,
+          "ram_required_gb": 7,
+          "checksum": null,
+          "price_sol": 0.0
+        },
+        "14b": {
+          "hf_repo": "bartowski/Qwen2.5-Coder-14B-Instruct-GGUF",
+          "filename": "Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf",
+          "size_gb": 9.0,
+          "ram_required_gb": 14,
+          "checksum": null,
+          "price_sol": 0.0
+        }
+      }
+    },
+    {
+      "name": "llama3",
+      "tags": ["8b", "70b"],
+      "default_tag": "8b",
+      "tier": "free",
+      "description": "Meta Llama 3 — general purpose, excellent quality.",
+      "variants": {
+        "8b": {
+          "hf_repo": "bartowski/Meta-Llama-3-8B-Instruct-GGUF",
+          "filename": "Meta-Llama-3-8B-Instruct-Q4_K_M.gguf",
+          "size_gb": 4.9,
+          "ram_required_gb": 8,
+          "checksum": null,
+          "price_sol": 0.0
+        },
+        "70b": {
+          "hf_repo": "bartowski/Meta-Llama-3-70B-Instruct-GGUF",
+          "filename": "Meta-Llama-3-70B-Instruct-Q4_K_M.gguf",
+          "size_gb": 42.0,
+          "ram_required_gb": 48,
+          "checksum": null,
+          "price_sol": 0.002
+        }
+      }
+    },
+    {
+      "name": "mistral",
+      "tags": ["7b"],
+      "default_tag": "7b",
+      "tier": "free",
+      "description": "Mistral 7B — fast, efficient, great for general use.",
+      "variants": {
+        "7b": {
+          "hf_repo": "TheBloke/Mistral-7B-Instruct-v0.2-GGUF",
+          "filename": "mistral-7b-instruct-v0.2.Q4_K_M.gguf",
+          "size_gb": 4.4,
+          "ram_required_gb": 6,
+          "checksum": null,
+          "price_sol": 0.0
+        }
+      }
+    },
+    {
+      "name": "phi3",
+      "tags": ["mini", "medium"],
+      "default_tag": "mini",
+      "tier": "free",
+      "description": "Microsoft Phi-3 — surprisingly capable small models.",
+      "variants": {
+        "mini": {
+          "hf_repo": "bartowski/Phi-3-mini-4k-instruct-GGUF",
+          "filename": "Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+          "size_gb": 2.2,
+          "ram_required_gb": 4,
+          "checksum": null,
+          "price_sol": 0.0
+        },
+        "medium": {
+          "hf_repo": "bartowski/Phi-3-medium-4k-instruct-GGUF",
+          "filename": "Phi-3-medium-4k-instruct-Q4_K_M.gguf",
+          "size_gb": 8.5,
+          "ram_required_gb": 12,
+          "checksum": null,
+          "price_sol": 0.0
+        }
+      }
+    },
+    {
+      "name": "deepseek-coder",
+      "tags": ["6.7b", "33b"],
+      "default_tag": "6.7b",
+      "tier": "free",
+      "description": "DeepSeek Coder — top-tier coding model.",
+      "variants": {
+        "6.7b": {
+          "hf_repo": "TheBloke/deepseek-coder-6.7B-instruct-GGUF",
+          "filename": "deepseek-coder-6.7b-instruct.Q4_K_M.gguf",
+          "size_gb": 4.1,
+          "ram_required_gb": 6,
+          "checksum": null,
+          "price_sol": 0.0
+        },
+        "33b": {
+          "hf_repo": "TheBloke/deepseek-coder-33B-instruct-GGUF",
+          "filename": "deepseek-coder-33b-instruct.Q4_K_M.gguf",
+          "size_gb": 20.0,
+          "ram_required_gb": 24,
+          "checksum": null,
+          "price_sol": 0.001
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+# Rust
+/target
+Cargo.lock
+
+# Environment
+.env
+.env.*
+
+# Models (these are huge, users download their own)
+/models
+*.gguf
+*.bin
+*.ggml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
