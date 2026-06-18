@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mimona — WhatsApp Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0a0c;--surface:#111116;--surface2:#18181f;--surface3:#1f1f2b;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+  --accent:#6c5ce7;--accent2:#00cec9;--accent3:#fd79a8;
+  --text:#e8e8f0;--muted:#6b6b80;--muted2:#9090a8;
+  --green:#00b894;--yellow:#fdcb6e;--red:#e17055;
+  --mono:'DM Mono',monospace;--display:'Syne',sans-serif;
+  --radius:10px;--radius-lg:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;min-height:100vh;display:flex;justify-content:center;padding:48px 20px;}
+#wrap{width:100%;max-width:560px;}
+.logo{display:flex;align-items:center;gap:10px;margin-bottom:28px;}
+.logo-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:15px;color:#fff;}
+.logo-name{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:-0.5px;}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;margin-bottom:16px;}
+.card h2{font-family:var(--display);font-weight:600;font-size:15px;margin-bottom:4px;}
+.card .hint{font-size:11.5px;color:var(--muted2);line-height:1.5;margin-bottom:18px;}
+
+label{display:block;font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+input[type=text], input[type=tel], textarea{
+  width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
+  color:var(--text);font-family:var(--mono);font-size:13px;padding:10px 12px;outline:none;transition:border-color .15s;
+}
+input:focus, textarea:focus{border-color:var(--accent);}
+textarea{resize:vertical;min-height:90px;line-height:1.5;}
+
+.method-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;}
+.method-card{border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s;background:var(--surface2);}
+.method-card:hover{border-color:var(--border2);}
+.method-card.selected{border-color:var(--accent);background:rgba(108,92,231,0.08);}
+.method-card.disabled{cursor:not-allowed;opacity:.5;}
+.method-card.disabled:hover{border-color:var(--border);}
+.method-card .title{font-weight:500;font-size:12.5px;margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+.method-card .desc{font-size:10.5px;color:var(--muted2);line-height:1.45;}
+.tag{font-size:9px;padding:1px 6px;border-radius:10px;font-weight:500;letter-spacing:.3px;}
+.tag-free{background:rgba(0,184,148,0.12);color:var(--green);}
+.tag-needs{background:rgba(253,203,110,0.12);color:var(--yellow);}
+.tag-unavailable{background:rgba(225,112,85,0.12);color:var(--red);}
+
+button{font-family:var(--mono);font-size:12.5px;border:none;border-radius:var(--radius);padding:10px 18px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:500;}
+.btn-primary:hover{opacity:.9;}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;}
+.btn-ghost{background:var(--surface2);color:var(--muted2);border:1px solid var(--border);}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2);}
+.row{display:flex;gap:10px;margin-top:16px;}
+
+.status-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500;}
+.status-connected{background:rgba(0,184,148,0.12);color:var(--green);}
+.status-pending{background:rgba(253,203,110,0.12);color:var(--yellow);}
+.status-disconnected{background:rgba(225,112,85,0.12);color:var(--red);}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+#qrBox{display:none;text-align:center;padding:20px 0;}
+#qrBox img{width:220px;height:220px;border-radius:var(--radius);background:#fff;padding:10px;}
+#qrBox p{font-size:11.5px;color:var(--muted2);margin-top:12px;}
+
+.hidden{display:none !important;}
+.error-text{color:var(--red);font-size:11.5px;margin-top:8px;}
+.success-text{color:var(--green);font-size:11.5px;margin-top:8px;}
+
+#promptSection{display:none;}
+.field-spacer{height:14px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+
+  <div class="logo">
+    <div class="logo-mark">M</div>
+    <div>
+      <div class="logo-name">Mimona</div>
+      <div class="logo-sub">WhatsApp Assistant Setup</div>
+    </div>
+  </div>
+
+  <!-- Step 1: link -->
+  <div class="card" id="linkCard">
+    <h2>Link your WhatsApp</h2>
+    <div class="hint">Choose how Mimona connects to WhatsApp.</div>
+
+    <label>Connection method</label>
+    <div class="method-grid">
+      <div class="method-card selected" data-method="baileys" id="methodBaileys">
+        <div class="title">Scan QR Code <span class="tag tag-free">No business verification needed</span></div>
+        <div class="desc">Scan a QR code with your own WhatsApp. No business verification needed — but it's outside WhatsApp's official terms, so the number can be banned without warning. Good for testing.</div>
+      </div>
+      <div class="method-card disabled" data-method="official" id="methodOfficial">
+        <div class="title">Official API <span class="tag tag-unavailable">Unavailable</span></div>
+        <div class="desc">Meta's Cloud API. Requires business verification and a dedicated number. The compliant path for production use — coming soon.</div>
+      </div>
+    </div>
+
+
+    <div class="field-spacer"></div>
+    <div id="phoneFieldWrap">
+      <label>WhatsApp number (with country code)</label>
+      <input type="tel" id="phoneInput" placeholder="+15551234567">
+    </div>
+    <div class="row">
+      <button class="btn-primary" id="linkBtn">Connect</button>
+    </div>
+    <div id="linkError" class="error-text hidden"></div>
+  </div>
+
+  <!-- Step 2: QR (Baileys only) -->
+  <div class="card hidden" id="qrCard">
+    <h2>Scan to connect</h2>
+    <div class="hint">Open WhatsApp on your phone → Settings → Linked Devices → Link a Device, then scan this code.</div>
+    <div id="qrBox">
+      <img id="qrImg" alt="QR code">
+      <p id="qrStatusText">Waiting for scan…</p>
+    </div>
+  </div>
+
+  <!-- Step 3: official pending -->
+  <div class="card hidden" id="officialPendingCard">
+    <h2>Official API setup pending</h2>
+    <div class="hint">
+      Your number is registered, but the bridge isn't seeing Meta credentials yet.
+      Once business verification is complete, set <code>META_PHONE_NUMBER_ID</code> and
+      <code>META_ACCESS_TOKEN</code> in the bridge's environment and restart it — this page
+      will pick up the connection automatically.
+    </div>
+    <button class="btn-ghost" id="retryOfficialBtn">Check again</button>
+  </div>
+
+  <!-- Step 4: connected + prompt editor -->
+  <div class="card hidden" id="connectedCard">
+    <h2>Assistant connected <span class="status-pill status-connected" style="margin-left:8px;"><span class="dot"></span>Live</span></h2>
+    <div class="hint">Your number is linked. Messages sent to it on WhatsApp now go through Mimona.</div>
+  </div>
+
+  <div class="card hidden" id="promptCard">
+    <h2>Assistant prompt</h2>
+    <div class="hint">This defines how your assistant behaves on WhatsApp. You can change it any time — it takes effect on the very next message, no relink needed.</div>
+    <label>System prompt</label>
+    <textarea id="promptInput"></textarea>
+    <div class="row">
+      <button class="btn-primary" id="savePromptBtn">Save prompt</button>
+      <button class="btn-ghost" id="unlinkBtn">Unlink number</button>
+    </div>
+    <div id="promptStatus"></div>
+  </div>
+
+</div>
+
+<script>
+const MIMONA_API = ""; // same origin — served by mimona serve
+const BRIDGE_API = "http://localhost:3344"; // whatsapp-bridge service
+
+let selectedMethod = "baileys";
+let currentPhone = null;
+let pollTimer = null;
+
+document.querySelectorAll(".method-card").forEach(card => {
+  card.addEventListener("click", () => {
+    if (card.classList.contains("disabled")) return;
+    document.querySelectorAll(".method-card").forEach(c => c.classList.remove("selected"));
+    card.classList.add("selected");
+    selectedMethod = card.dataset.method;
+    updatePhoneFieldVisibility();
+  });
+});
+
+function updatePhoneFieldVisibility() {
+  // Baileys never needs a number upfront — Mimona only learns the real
+  // number after the QR scan succeeds. Official still needs one, since
+  // Meta's Cloud API requires a pre-registered business number.
+  document.getElementById("phoneFieldWrap").classList.toggle("hidden", selectedMethod === "baileys");
+}
+updatePhoneFieldVisibility();
+
+function showError(msg) {
+  const el = document.getElementById("linkError");
+  el.textContent = msg;
+  el.classList.remove("hidden");
+}
+
+function hideError() {
+  document.getElementById("linkError").classList.add("hidden");
+}
+
+document.getElementById("linkBtn").addEventListener("click", async () => {
+  hideError();
+
+  if (selectedMethod === "baileys") {
+    document.getElementById("linkCard").classList.add("hidden");
+    await startBaileysFlow();
+    return;
+  }
+
+  // Official path still needs a number upfront.
+  const phone = document.getElementById("phoneInput").value.trim();
+  if (!phone.startsWith("+") || phone.length < 8) {
+    showError("Enter a full number with country code, e.g. +15551234567");
+    return;
+  }
+  currentPhone = phone;
+
+  try {
+    const linkRes = await fetch(`${MIMONA_API}/api/whatsapp/link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone_number: phone, connection_method: selectedMethod }),
+    });
+    if (!linkRes.ok) {
+      const e = await linkRes.json().catch(() => ({}));
+      throw new Error(e.error || "Failed to register with Mimona");
+    }
+
+    document.getElementById("linkCard").classList.add("hidden");
+    await startOfficialFlow(phone);
+  } catch (err) {
+    document.getElementById("linkCard").classList.remove("hidden");
+    showError(err.message);
+  }
+});
+
+let currentSessionId = null;
+
+/**
+ * Baileys: no phone number needed to kick things off. The bridge hands
+ * back a session_id; we poll that session's status until Baileys
+ * resolves the real number (after the user scans the QR), at which
+ * point Mimona's user record exists and we move to the prompt editor.
+ */
+async function startBaileysFlow() {
+  document.getElementById("qrCard").classList.remove("hidden");
+  document.getElementById("qrBox").style.display = "block";
+  document.getElementById("qrStatusText").textContent = "Starting…";
+
+  try {
+    const res = await fetch(`${BRIDGE_API}/baileys/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    currentSessionId = data.session_id;
+  } catch (err) {
+    document.getElementById("qrStatusText").textContent =
+      "Couldn't reach the WhatsApp bridge — make sure it's running (npm start in whatsapp-bridge/).";
+    return;
+  }
+
+  pollTimer = setInterval(() => pollBaileysStatus(), 2000);
+  pollBaileysStatus();
+}
+
+async function pollBaileysStatus() {
+  if (!currentSessionId) return;
+  try {
+    const res = await fetch(`${BRIDGE_API}/baileys/status?session_id=${encodeURIComponent(currentSessionId)}`);
+    const data = await res.json();
+
+    if (data.qr) {
+      document.getElementById("qrImg").src = data.qr;
+      document.getElementById("qrStatusText").textContent = "Waiting for scan…";
+    }
+
+    if (data.state === "connected" && data.phone_number) {
+      clearInterval(pollTimer);
+      currentPhone = data.phone_number;
+      document.getElementById("qrCard").classList.add("hidden");
+      await onConnected(currentPhone);
+    }
+  } catch (err) {
+    document.getElementById("qrStatusText").textContent = "Lost contact with the bridge — retrying…";
+  }
+}
+
+async function startOfficialFlow(phone) {
+  try {
+    const res = await fetch(`${BRIDGE_API}/official/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone_number: phone }),
+    });
+    if (res.ok) {
+      await onConnected(phone);
+      return;
+    }
+  } catch (err) {
+    // bridge unreachable or not configured — fall through to pending card
+  }
+  document.getElementById("officialPendingCard").classList.remove("hidden");
+}
+
+document.getElementById("retryOfficialBtn").addEventListener("click", async () => {
+  if (!currentPhone) return;
+  document.getElementById("officialPendingCard").classList.add("hidden");
+  await startOfficialFlow(currentPhone);
+});
+
+async function onConnected(phone) {
+  document.getElementById("connectedCard").classList.remove("hidden");
+  document.getElementById("promptCard").classList.remove("hidden");
+
+  const userRes = await fetch(`${MIMONA_API}/api/whatsapp/users/${encodeURIComponent(phone)}`);
+  if (userRes.ok) {
+    const { user } = await userRes.json();
+    document.getElementById("promptInput").value = user.system_prompt;
+  }
+}
+
+document.getElementById("savePromptBtn").addEventListener("click", async () => {
+  if (!currentPhone) return;
+  const prompt = document.getElementById("promptInput").value.trim();
+  const statusEl = document.getElementById("promptStatus");
+  statusEl.className = "";
+  statusEl.textContent = "";
+
+  if (!prompt) {
+    statusEl.className = "error-text";
+    statusEl.textContent = "Prompt can't be empty.";
+    return;
+  }
+
+  try {
+    const res = await fetch(`${MIMONA_API}/api/whatsapp/users/${encodeURIComponent(currentPhone)}/prompt`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ system_prompt: prompt }),
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || "Failed to save");
+    }
+    statusEl.className = "success-text";
+    statusEl.textContent = "Saved — your assistant will use this from the next message onward.";
+  } catch (err) {
+    statusEl.className = "error-text";
+    statusEl.textContent = err.message;
+  }
+});
+
+document.getElementById("unlinkBtn").addEventListener("click", async () => {
+  if (!currentPhone) return;
+  if (!confirm("Unlink this number? You'll need to scan a new QR code (or re-register) to reconnect.")) return;
+
+  await fetch(`${BRIDGE_API}/baileys/stop`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: currentSessionId }),
+  }).catch(() => {});
+
+  await fetch(`${MIMONA_API}/api/whatsapp/users/${encodeURIComponent(currentPhone)}`, {
+    method: "DELETE",
+  }).catch(() => {});
+
+  location.reload();
+});
+
+// If someone reloads this page with a number already linked (e.g.
+// bookmarked ?phone=... after connecting), resume the right view
+// instead of always showing step 1. This only applies once a real
+// number is known — Baileys's pre-scan state has no number to restore.
+(async function restoreIfAlreadyLinked() {
+  const params = new URLSearchParams(location.search);
+  const phone = params.get("phone");
+  if (!phone) return;
+
+  currentPhone = phone;
+
+  const res = await fetch(`${MIMONA_API}/api/whatsapp/users/${encodeURIComponent(phone)}`);
+  if (!res.ok) return;
+
+  const { user } = await res.json();
+  document.getElementById("linkCard").classList.add("hidden");
+
+  if (user.status === "connected") {
+    await onConnected(phone);
+  } else if (user.connection_method === "official") {
+    await startOfficialFlow(phone);
+  }
+  // Note: a Baileys user reloading mid-pairing has no session_id to
+  // resume against (it isn't persisted to the URL), so they'd need to
+  // restart the QR flow from the link card in that edge case.
+})();
+</script>
+
+</body>
+</html>

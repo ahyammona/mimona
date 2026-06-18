@@ -6,6 +6,8 @@ mod models;
 mod node;
 mod payment;
 mod server;
+mod whatsapp;
+mod whatsapp_bridge_launcher;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

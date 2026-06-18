@@ -23,4 +23,6 @@ Thumbs.db
 *.swo
 
 # Logs
-*.log
+*.logwhatsapp-bridge/auth_sessions/
+whatsapp-bridge/node_modules/
+whatsapp-bridge/.env

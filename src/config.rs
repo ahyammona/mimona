@@ -21,6 +21,14 @@ pub fn wallet_path() -> PathBuf {
     mimona_dir().join("wallet.json")
 }
 
+pub fn whatsapp_users_path() -> PathBuf {
+    mimona_dir().join("whatsapp_users.json")
+}
+
+pub fn whatsapp_bridge_log_path() -> PathBuf {
+    mimona_dir().join("whatsapp-bridge.log")
+}
+
 pub async fn ensure_dirs() -> Result<()> {
     fs::create_dir_all(models_dir()).await?;
     Ok(())
