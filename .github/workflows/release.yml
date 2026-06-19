@@ -1,14 +1,12 @@
 name: Release
-
 on:
   push:
     tags:
       - 'v*'
-
 permissions:
   contents: write
-
 jobs:
+  # ── Build the Rust binary for each platform ─────────────────────────────────
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
@@ -19,19 +17,15 @@ jobs:
           - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
             artifact: mimona-linux-x86_64
-
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact: mimona-macos-x86_64
-
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact: mimona-macos-arm64
-
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact: mimona-windows-x86_64.exe
-
     steps:
       - uses: actions/checkout@v4
 
@@ -53,8 +47,53 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: cp target/${{ matrix.target }}/release/mimona.exe ${{ matrix.artifact }}
 
-      - name: Upload to release
+      - name: Upload binary to release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.artifact }}
           generate_release_notes: true
+
+  # ── Bundle whatsapp-bridge + frontend into a single zip for all platforms ───
+  # Users need these files alongside the binary. We only need to build this
+  # once since it's platform-independent Node.js + HTML.
+  bundle:
+    name: Bundle assets (whatsapp-bridge + frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install bridge dependencies
+        run: |
+          cd whatsapp-bridge
+          # Use HTTPS instead of git:// to avoid SSH key prompts in CI
+          git config --global url."https://".insteadOf git://
+          npm install --ignore-scripts
+
+      - name: Create assets bundle
+        run: |
+          mkdir -p mimona-assets
+          # whatsapp-bridge with node_modules pre-installed
+          cp -r whatsapp-bridge mimona-assets/whatsapp-bridge
+          # Remove any auth sessions or .env that snuck in
+          rm -rf mimona-assets/whatsapp-bridge/auth_sessions
+          rm -f  mimona-assets/whatsapp-bridge/.env
+          # Frontend HTML files
+          cp -r frontend mimona-assets/frontend
+          # Registry and install script
+          cp registry.json mimona-assets/
+          cp install.sh mimona-assets/
+          # Zip it up
+          zip -r mimona-assets.zip mimona-assets
+          echo "Bundle contents:"
+          unzip -l mimona-assets.zip | tail -20
+
+      - name: Upload assets bundle to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: mimona-assets.zip
+          generate_release_notes: false
