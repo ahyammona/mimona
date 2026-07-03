@@ -29,6 +29,10 @@ pub fn whatsapp_bridge_log_path() -> PathBuf {
     mimona_dir().join("whatsapp-bridge.log")
 }
 
+pub fn widget_settings_path() -> PathBuf {
+    mimona_dir().join("widget_settings.json")
+}
+
 pub async fn ensure_dirs() -> Result<()> {
     fs::create_dir_all(models_dir()).await?;
     Ok(())

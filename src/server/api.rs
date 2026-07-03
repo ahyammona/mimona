@@ -1,5 +1,6 @@
 use crate::server::routes::{
-    chat_completions, health, list_models_openai, list_tags, ollama_generate, web_search, AppState,
+    chat_completions, health, list_models_openai, list_tags, ollama_generate, web_search,
+    widget_chat, widget_js, widget_page, AppState,
 };
 use crate::whatsapp::{
     get_user_route, link, list_users_route, set_model_route, set_prompt_route, set_status_route,
@@ -41,6 +42,10 @@ pub async fn start(host: String, port: u16) -> Result<()> {
         .route("/api/generate", post(ollama_generate))
         .route("/v1/models", get(list_models_openai))
         .route("/v1/chat/completions", post(chat_completions))
+        // Widget / embed routes
+        .route("/widget.js", get(widget_js))
+        .route("/widget", get(widget_page))
+        .route("/api/widget/chat", post(widget_chat))
         // WhatsApp link + config routes
         .route("/api/whatsapp/link", post(link))
         .route("/api/whatsapp/users", get(list_users_route))
@@ -65,6 +70,7 @@ pub async fn start(host: String, port: u16) -> Result<()> {
     println!("  {} http://{}/v1/chat/completions", "Chat API:".dimmed(), addr);
     println!("  {} http://{}/api/generate", "Generate:".dimmed(), addr);
     println!("  {} http://{}/v1/models", "Models:".dimmed(), addr);
+    println!("  {} http://{}/widget.js", "Widget embed:".dimmed(), addr.cyan().bold());
     println!();
 
     crate::whatsapp_bridge_launcher::ensure_bridge_running().await;

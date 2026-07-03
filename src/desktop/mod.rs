@@ -1,0 +1,12 @@
+pub mod app;
+pub mod state;
+pub mod worker;
+pub mod panel_chat;
+pub mod panel_models;
+pub mod panel_whatsapp;
+pub mod panel_automate;
+pub mod panel_animation;
+pub mod panel_website;
+pub mod panel_widget;
+
+pub use app::MimonaApp;

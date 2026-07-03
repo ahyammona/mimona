@@ -207,10 +207,16 @@ export function stopBaileysSession(sessionId) {
 
 /**
  * Resume sessions for users already marked connected in Mimona after a
- * bridge restart. Their session dir is keyed by phone number in this
- * case (see config note in index.js) since session_id values aren't
- * persisted across restarts — only the resolved phone number is.
+ * bridge restart. Pre-sets the phoneNumber so incoming messages are
+ * handled immediately without waiting for connection.open to fire.
  */
 export async function startBaileysSessionForKnownNumber(phoneNumber) {
-  return startBaileysSession(phoneNumber);
+  const session = await startBaileysSession(phoneNumber);
+  // Pre-set the phone number so messages.upsert doesn't drop
+  // messages while waiting for connection.open on resume
+  if (session && !session.phoneNumber) {
+    session.phoneNumber = phoneNumber;
+    sessions.set(phoneNumber, session);
+  }
+  return session;
 }

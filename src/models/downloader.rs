@@ -8,6 +8,8 @@ use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 
@@ -132,5 +134,115 @@ async fn verify_checksum(path: &PathBuf, expected: &str) -> Result<()> {
             actual
         ));
     }
+    Ok(())
+}
+
+// ── Desktop UI variant: live progress + cooperative cancellation ───────────
+//
+// Used by the desktop worker (src/desktop/worker.rs) instead of
+// `download_model`, so the UI can show real byte-level progress and let the
+// user cancel an in-flight download. Returns Err with the exact message
+// "cancelled" if the download was stopped via the cancel flag, which callers
+// can match on to distinguish a deliberate cancel from a real error.
+pub async fn download_model_ui<F>(
+    entry: &ModelEntry,
+    tag: &str,
+    cancel: Arc<AtomicBool>,
+    mut on_progress: F,
+) -> Result<PathBuf>
+where
+    F: FnMut(u64, u64) + Send,
+{
+    let variant = entry
+        .variants
+        .get(tag)
+        .ok_or_else(|| anyhow!("Tag '{}' not found for model '{}'", tag, entry.name))?;
+
+    let dest = models_dir().join(&variant.filename);
+
+    if dest.exists() {
+        return Ok(dest);
+    }
+
+    fs::create_dir_all(models_dir()).await?;
+
+    download_from_hf_ui(variant, &dest, &cancel, &mut on_progress).await?;
+
+    if let Some(expected) = &variant.checksum {
+        verify_checksum(&dest, expected).await?;
+    }
+
+    let meta = fs::metadata(&dest).await?;
+    register_model(LocalModel {
+        name: entry.name.clone(),
+        tag: tag.to_string(),
+        filename: variant.filename.clone(),
+        size_bytes: meta.len(),
+        downloaded_at: Utc::now().to_rfc3339(),
+        checksum: variant.checksum.clone(),
+    })
+    .await?;
+
+    Ok(dest)
+}
+
+async fn download_from_hf_ui<F>(
+    variant: &ModelVariant,
+    dest: &PathBuf,
+    cancel: &Arc<AtomicBool>,
+    on_progress: &mut F,
+) -> Result<()>
+where
+    F: FnMut(u64, u64) + Send,
+{
+    let url = format!(
+        "{}/{}/resolve/main/{}",
+        HF_BASE, variant.hf_repo, variant.filename
+    );
+
+    let mut req = reqwest::Client::new().get(&url);
+    if let Ok(token) = std::env::var(HF_TOKEN_ENV) {
+        req = req.bearer_auth(token);
+    }
+
+    let resp = req
+        .send()
+        .await
+        .context("Failed to connect to HuggingFace")?;
+
+    if !resp.status().is_success() {
+        if resp.status() == 401 || resp.status() == 403 {
+            return Err(anyhow!(
+                "Access denied. Set HF_TOKEN env var for gated models."
+            ));
+        }
+        return Err(anyhow!("HTTP {} from HuggingFace", resp.status()));
+    }
+
+    let total = resp.content_length().unwrap_or(0);
+
+    let tmp = dest.with_extension("part");
+    let mut file = File::create(&tmp).await?;
+    let mut stream = resp.bytes_stream();
+    let mut downloaded: u64 = 0;
+
+    while let Some(chunk) = stream.next().await {
+        if cancel.load(Ordering::Relaxed) {
+            drop(file);
+            let _ = fs::remove_file(&tmp).await;
+            return Err(anyhow!("cancelled"));
+        }
+
+        let chunk = chunk.context("Stream error")?;
+        downloaded += chunk.len() as u64;
+        on_progress(downloaded, total);
+        file.write_all(&chunk).await?;
+    }
+
+    file.flush().await?;
+    drop(file);
+
+    fs::rename(&tmp, dest).await?;
+
     Ok(())
 }

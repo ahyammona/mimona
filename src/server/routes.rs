@@ -230,6 +230,186 @@ pub async fn ollama_generate(Json(body): Json<OllamaGenerateRequest>) -> impl In
 }
 
 
+// ── Widget / Embed ────────────────────────────────────────────────────────────
+
+pub async fn widget_js() -> impl IntoResponse {
+    let settings = crate::widget::WidgetSettings::load().await;
+    let color = settings.color;
+    let bot_name = settings.bot_name;
+
+    let js = format!(r#"(function() {{
+  var COLOR = {color:?};
+  var BOT_NAME = {bot_name:?};
+  var origin = (function() {{
+    var s = document.currentScript;
+    if (s && s.src) {{ try {{ return new URL(s.src).origin; }} catch (e) {{}} }}
+    return '';
+  }})();
+
+  var btn = document.createElement('div');
+  btn.innerHTML = '💬';
+  btn.title = BOT_NAME;
+  btn.style.cssText = 'position:fixed;bottom:20px;right:20px;width:56px;height:56px;' +
+    'border-radius:50%;background:' + COLOR + ';color:#fff;display:flex;' +
+    'align-items:center;justify-content:center;font-size:24px;cursor:pointer;' +
+    'box-shadow:0 4px 16px rgba(0,0,0,.25);z-index:999999;';
+  document.body.appendChild(btn);
+
+  var iframe = null;
+  btn.addEventListener('click', function() {{
+    if (!iframe) {{
+      iframe = document.createElement('iframe');
+      iframe.src = origin + '/widget';
+      iframe.style.cssText = 'position:fixed;bottom:88px;right:20px;width:360px;' +
+        'max-width:92vw;height:520px;max-height:80vh;border:none;border-radius:16px;' +
+        'box-shadow:0 10px 40px rgba(0,0,0,.25);z-index:999998;background:#fff;';
+      document.body.appendChild(iframe);
+    }} else {{
+      iframe.style.display = (iframe.style.display === 'none') ? 'block' : 'none';
+    }}
+  }});
+}})();
+"#);
+
+    (
+        [(axum::http::header::CONTENT_TYPE, "application/javascript")],
+        js,
+    ).into_response()
+}
+
+pub async fn widget_page() -> impl IntoResponse {
+    let settings = crate::widget::WidgetSettings::load().await;
+    let bot_name = settings.bot_name;
+    let welcome = settings.welcome;
+    let color = settings.color;
+
+    let html = format!(r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{bot_name}</title>
+<style>
+  * {{ box-sizing: border-box; }}
+  body {{ margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display:flex; flex-direction:column; height:100vh; background:#fff; }}
+  header {{ background:{color}; color:#fff; padding:14px 16px; font-weight:600; font-size:15px; }}
+  #msgs {{ flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }}
+  .msg {{ max-width:80%; padding:8px 12px; border-radius:14px; font-size:13.5px; line-height:1.4; white-space:pre-wrap; }}
+  .bot {{ align-self:flex-start; background:#f1f1f3; color:#111; }}
+  .user {{ align-self:flex-end; background:{color}; color:#fff; }}
+  #inputRow {{ display:flex; border-top:1px solid #eee; padding:10px; gap:8px; }}
+  #inputRow input {{ flex:1; border:1px solid #ddd; border-radius:20px; padding:9px 14px; font-size:13.5px; outline:none; }}
+  #inputRow button {{ background:{color}; color:#fff; border:none; border-radius:20px; padding:0 16px; font-size:13.5px; cursor:pointer; }}
+</style>
+</head>
+<body>
+<header>{bot_name}</header>
+<div id="msgs"></div>
+<div id="inputRow">
+  <input id="inputBox" type="text" placeholder="Type a message…" />
+  <button id="sendBtn">Send</button>
+</div>
+<script>
+  var msgsEl = document.getElementById('msgs');
+  var history = [];
+
+  function addMsg(role, text) {{
+    var div = document.createElement('div');
+    div.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+    div.textContent = text;
+    msgsEl.appendChild(div);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }}
+
+  addMsg('bot', {welcome:?});
+
+  async function send() {{
+    var input = document.getElementById('inputBox');
+    var text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    addMsg('user', text);
+    history.push({{ role: 'user', content: text }});
+
+    try {{
+      var res = await fetch('/api/widget/chat', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ messages: history }})
+      }});
+      var data = await res.json();
+      var reply = data.reply || "Sorry, something went wrong.";
+      addMsg('bot', reply);
+      history.push({{ role: 'assistant', content: reply }});
+    }} catch (e) {{
+      addMsg('bot', "Sorry, I couldn't connect. Please try again.");
+    }}
+  }}
+
+  document.getElementById('sendBtn').addEventListener('click', send);
+  document.getElementById('inputBox').addEventListener('keydown', function(e) {{
+    if (e.key === 'Enter') send();
+  }});
+</script>
+</body>
+</html>"#);
+
+    axum::response::Html(html)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WidgetChatRequest {
+    pub messages: Vec<OaiMessage>,
+}
+
+pub async fn widget_chat(Json(body): Json<WidgetChatRequest>) -> impl IntoResponse {
+    let settings = crate::widget::WidgetSettings::load().await;
+
+    let ollama_model = resolve_ollama_model(&settings.model).await
+        .unwrap_or(settings.model);
+
+    let mut messages = vec![json!({"role": "system", "content": settings.system_prompt})];
+    for m in &body.messages {
+        messages.push(json!({"role": m.role, "content": m.content}));
+    }
+
+    let ollama_body = json!({
+        "model": ollama_model,
+        "messages": messages,
+        "stream": false,
+        "options": { "temperature": 0.7, "num_predict": 512 }
+    });
+
+    let client = reqwest::Client::new();
+    let resp = match client
+        .post(format!("{}/api/chat", OLLAMA_BASE))
+        .json(&ollama_body)
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            return Json(json!({
+                "reply": format!("Sorry, I couldn't reach the AI right now ({}).", e)
+            })).into_response();
+        }
+    };
+
+    let data: Value = match resp.json().await {
+        Ok(v) => v,
+        Err(_) => {
+            return Json(json!({ "reply": "Sorry, something went wrong." })).into_response();
+        }
+    };
+
+    let reply = data["message"]["content"]
+        .as_str()
+        .unwrap_or("Sorry, I don't have a response for that.")
+        .to_string();
+
+    Json(json!({ "reply": reply })).into_response()
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SearchQuery {
     pub q: String,
@@ -237,8 +417,14 @@ pub struct SearchQuery {
 
 pub async fn web_search(axum::extract::Query(params): axum::extract::Query<SearchQuery>) -> impl IntoResponse {
     let query = &params.q;
-    
-    let api_key = "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";
+
+    let api_key = match std::env::var("TAVILY_API_KEY") {
+        Ok(k) if !k.trim().is_empty() => k,
+        _ => {
+            println!("[search] TAVILY_API_KEY not set — set it as an environment variable before starting mimona serve.");
+            return Json(json!({"query": query, "results": [], "error": "Search not configured"})).into_response();
+        }
+    };
 
     let client = reqwest::Client::new();
     
