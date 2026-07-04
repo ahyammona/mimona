@@ -8,38 +8,22 @@ on:
       tag:
         description: 'Release tag (e.g. v0.2.0)'
         required: true
+
 permissions:
   contents: write
+
 jobs:
+  # ── Raw binary (for install.sh / manual download) ─────────────────────────
   build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            artifact: mimona-linux-x86_64
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact: mimona-macos-x86_64
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            artifact: mimona-macos-arm64
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact: mimona-windows-x86_64.exe
+    name: Build Linux binary
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
 
       - name: Install Linux dependencies
-        if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -48,63 +32,21 @@ jobs:
             libegl1-mesa-dev libgles2-mesa-dev
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release
 
-      - name: Rename binary (Unix)
-        if: matrix.os != 'windows-latest'
+      - name: Rename binary
         run: |
-          cp target/${{ matrix.target }}/release/mimona ${{ matrix.artifact }}
-          chmod +x ${{ matrix.artifact }}
-
-      - name: Rename binary (Windows)
-        if: matrix.os == 'windows-latest'
-        run: cp target/${{ matrix.target }}/release/mimona.exe ${{ matrix.artifact }}
+          cp target/release/mimona mimona-linux-x86_64
+          chmod +x mimona-linux-x86_64
 
       - name: Upload binary to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: ${{ matrix.artifact }}
+          files: mimona-linux-x86_64
           generate_release_notes: true
 
-  # ── Windows installer (.msi) ──────────────────────────────────────────────
-  windows-installer:
-    name: Windows Installer (.msi)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
-
-      - name: Build release binary
-        run: cargo build --release --target x86_64-pc-windows-msvc
-
-      - name: Install WiX Toolset
-        run: |
-          choco install wixtoolset -y
-          echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> $env:GITHUB_PATH
-
-      - name: Install cargo-wix
-        run: cargo install cargo-wix
-
-      - name: Init wix (if not already done)
-        run: |
-          if (!(Test-Path "wix")) { cargo wix init }
-
-      - name: Build MSI installer
-        run: cargo wix --no-build --nocapture -p mimona
-
-      - name: Upload MSI to release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: target/wix/*.msi
-          generate_release_notes: false
-
-  # ── Linux .deb (Ubuntu/Debian) ────────────────────────────────────────────
+  # ── .deb installer (Ubuntu/Debian) ────────────────────────────────────────
   linux-deb:
     name: Linux Installer (.deb)
     runs-on: ubuntu-22.04
@@ -136,73 +78,6 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: target/debian/*.deb
-          generate_release_notes: false
-
-  # ── Linux AppImage (any distro) ───────────────────────────────────────────
-  linux-appimage:
-    name: Linux AppImage
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-3-dev libxcb-render0-dev libxcb-shape0-dev \
-            libxcb-xfixes0-dev libxkbcommon-dev libssl-dev \
-            libegl1-mesa-dev libgles2-mesa-dev wget
-
-      - name: Build release binary
-        run: cargo build --release
-
-      - name: Package AppImage
-        run: |
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/share/mimona
-          mkdir -p AppDir/usr/share/applications
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-
-          cp target/release/mimona AppDir/usr/bin/
-          cp registry.json AppDir/usr/share/mimona/
-          cp -r frontend AppDir/usr/share/mimona/ 2>/dev/null || true
-          cp assets/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/mimona.png 2>/dev/null || true
-
-          cat > AppDir/usr/share/applications/mimona.desktop << 'DESKTOP'
-          [Desktop Entry]
-          Name=Mimona
-          Comment=Your local AI runtime
-          Exec=mimona
-          Icon=mimona
-          Terminal=false
-          Type=Application
-          Categories=Utility;AI;
-          DESKTOP
-
-          cat > AppDir/AppRun << 'APPRUN'
-          #!/bin/bash
-          HERE="$(dirname "$(readlink -f "${0}")")"
-          export PATH="${HERE}/usr/bin:${PATH}"
-          export MIMONA_DATA="${HERE}/usr/share/mimona"
-          exec "${HERE}/usr/bin/mimona" "$@"
-          APPRUN
-          chmod +x AppDir/AppRun
-
-          cp AppDir/usr/share/icons/hicolor/256x256/apps/mimona.png AppDir/ 2>/dev/null || true
-          cp AppDir/usr/share/applications/mimona.desktop AppDir/ 2>/dev/null || true
-
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
-          ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir Mimona-x86_64.AppImage
-
-      - name: Upload AppImage to release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: Mimona-x86_64.AppImage
           generate_release_notes: false
 
   # ── Assets bundle (whatsapp-bridge + frontend) ────────────────────────────
