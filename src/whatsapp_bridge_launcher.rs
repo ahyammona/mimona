@@ -8,17 +8,31 @@ const BRIDGE_BASE: &str = "http://localhost:3344";
 /// falling back to the current working directory for `cargo run` during
 /// development. Mirrors the same lookup pattern used for frontend/ in
 /// server/api.rs.
-fn bridge_dir() -> PathBuf {
-    let exe = std::env::current_exe().unwrap_or_default();
-    let candidate = exe
-        .parent()
-        .unwrap_or(std::path::Path::new("."))
-        .join("whatsapp-bridge");
-    if candidate.exists() {
-        candidate
-    } else {
-        PathBuf::from("whatsapp-bridge")
+fn bridge_dir() -> Option<PathBuf> {
+    // Search multiple locations in order of preference
+    let mut candidates = vec![];
+
+    // 1. Next to the running binary
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            candidates.push(parent.join("whatsapp-bridge"));
+        }
     }
+
+    // 2. Current working directory
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("whatsapp-bridge"));
+    }
+
+    // 3. ~/.mimona/whatsapp-bridge (user installed here)
+    if let Some(home) = dirs::home_dir() {
+        candidates.push(home.join(".mimona").join("whatsapp-bridge"));
+    }
+
+    // 4. /opt/mimona/whatsapp-bridge (system install)
+    candidates.push(PathBuf::from("/opt/mimona/whatsapp-bridge"));
+
+    candidates.into_iter().find(|p| p.exists())
 }
 
 async fn ping_bridge() -> bool {
@@ -42,15 +56,17 @@ pub async fn ensure_bridge_running() {
         return;
     }
 
-    let dir = bridge_dir();
-    if !dir.exists() {
-        println!(
-            "  {} WhatsApp bridge not found at {} — skipping (WhatsApp support disabled)",
-            "!".yellow(),
-            dir.display()
-        );
-        return;
-    }
+    let dir = match bridge_dir() {
+        Some(d) => d,
+        None => {
+            println!(
+                "  {} WhatsApp bridge not found — skipping (WhatsApp support disabled)\n  {} Expected location: next to binary, ~/.mimona/whatsapp-bridge, or /opt/mimona/whatsapp-bridge",
+                "!".yellow(),
+                " ".dimmed()
+            );
+            return;
+        }
+    };
 
     if let Err(e) = ensure_dependencies_installed(&dir).await {
         println!(
