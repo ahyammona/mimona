@@ -9,11 +9,25 @@ pub struct ChatMessage {
     pub pending: bool,  // true while still streaming tokens in
 }
 
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub enum OllamaStatus {
+    #[default]
+    Checking,
+    Running,
+    NotInstalled,
+    NotRunning,
+}
+
 /// Everything a panel needs to read or mutate, wrapped in Arc<Mutex<>>
 /// so both the egui main thread and the Tokio background tasks can
 /// access it safely.
 #[derive(Default)]
 pub struct AppState {
+      // ── Setup ────────────────────────────────────────────────────────────
+    pub ollama_status: OllamaStatus,
+    pub setup_dismissed: bool,
+
     // ── Chat ────────────────────────────────────────────────────────────
     pub chat_history: Vec<ChatMessage>,
     pub chat_input: String,
@@ -122,6 +136,11 @@ pub struct WaUser {
 
 /// Commands the UI sends to the async Tokio worker.
 pub enum UiCommand {
+       // Setup
+    CheckOllama,
+    InstallOllama,
+    StartOllama,
+    DismissSetup,
     // Chat
     SendMessage { model: String, messages: Vec<(String, String)>, system: String },
 
@@ -181,6 +200,8 @@ pub enum UiCommand {
 
 /// Updates the async worker sends back to the UI.
 pub enum WorkerUpdate {
+    OllamaStatus(OllamaStatus),
+
     // Chat
     ChatToken(String),
     ChatDone,

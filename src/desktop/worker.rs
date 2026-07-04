@@ -91,6 +91,41 @@ pub async fn run_worker(
                     handle_check_manim(tx).await;
                 });
             }
+            UiCommand::CheckOllama => {
+                tokio::spawn(async move {
+                    handle_check_ollama(tx).await;
+                });
+            }
+            UiCommand::InstallOllama => {
+                // Open download page in browser
+                let url = if cfg!(target_os = "windows") {
+                    "https://ollama.com/download/windows"
+                } else if cfg!(target_os = "macos") {
+                    "https://ollama.com/download/mac"
+                } else {
+                    "https://ollama.com/download/linux"
+                };
+                let _ = tokio::process::Command::new(
+                    if cfg!(target_os = "windows") { "cmd" } else { "xdg-open" }
+                )
+                .args(if cfg!(target_os = "windows") { vec!["/c", "start", url] } else { vec![url] })
+                .spawn();
+            }
+             UiCommand::StartOllama => {
+                tokio::spawn(async move {
+                    handle_start_ollama(tx).await;
+                });
+            }
+            UiCommand::DismissSetup => {
+                let _ = tx.send(WorkerUpdate::OllamaStatus(OllamaStatus::Running));
+            }
+            UiCommand::OpenBrowser(url) => {
+                let _ = tokio::process::Command::new(
+                    if cfg!(target_os = "windows") { "cmd" } else { "xdg-open" }
+                )
+                .args(if cfg!(target_os = "windows") { vec!["/c", "start", &url] } else { vec![url.as_str()] })
+                .spawn();
+            }
             UiCommand::OpenVideo(path) => {
                 // Open video with system default player
                 let _ = tokio::process::Command::new("xdg-open")
@@ -128,6 +163,12 @@ pub async fn run_worker(
                     handle_automate_seo(business, location, keywords, model, tx).await;
                 });
             }
+            UiCommand::SaveWidgetSettings { bot_name, welcome, system_prompt, color } => {
+                // Save to config file
+                tokio::spawn(async move {
+                    handle_save_widget_settings(bot_name, welcome, system_prompt, color).await;//tx).await;
+                });
+            }
             UiCommand::DeployWebsite => {
                 // DeployWebsite is triggered from panel with brand already known
                 // The panel sends GenerateWebsite first, then DeployWebsite separately
@@ -151,6 +192,98 @@ pub async fn run_worker(
 }
 
 // ── Server bootstrap ──────────────────────────────────────────────────────────
+
+async fn handle_check_ollama(tx: UpdateSender) {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .unwrap_or_default();
+    
+    match client.get("http://localhost::11434/api/tags").send().await {
+        Ok(r) if r.status().is_success() => {
+            let _ = tx.send(WorkerUpdate::OllamaStatus(OllamaStatus::Running));
+        }
+         _ => {
+                // Check if ollama binary exists
+            let exists = tokio::process::Command::new("ollama")
+                .arg("--version")
+                .output()
+                .await
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+ 
+            if exists {
+                let _ = tx.send(WorkerUpdate::OllamaStatus(OllamaStatus::NotRunning));
+            } else {
+                let _ = tx.send(WorkerUpdate::OllamaStatus(OllamaStatus::NotInstalled));
+            }
+        }
+    }
+}
+ 
+async fn handle_start_ollama(tx: UpdateSender) {
+    let _ = tx.send(WorkerUpdate::StatusMessage("Starting Ollama…".into()));
+ 
+    // Start ollama serve in background
+    let result = tokio::process::Command::new("ollama")
+        .arg("serve")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+ 
+    if result.is_err() {
+        let _ = tx.send(WorkerUpdate::OllamaStatus(OllamaStatus::NotInstalled));
+        return;
+    }
+ 
+    // Wait up to 5 seconds for it to start
+    for _ in 0..10 {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(1))
+            .build()
+            .unwrap_or_default();
+        if let Ok(r) = client.get("http://localhost:11434/api/tags").send().await {
+            if r.status().is_success() {
+                let _ = tx.send(WorkerUpdate::OllamaStatus(OllamaStatus::Running));
+                return;
+            }
+        }
+    }
+ 
+    let _ = tx.send(WorkerUpdate::OllamaStatus(OllamaStatus::NotRunning));
+}
+
+
+// async fn handle_save_widget_settings(
+//     bot_name: String,
+//     welcome: String,
+//     system_prompt: String,
+//     color: String,
+//     tx: UpdateSender,
+// ) {
+//     // Save to ~/.mimona/widget_settings.json
+//     let settings = serde_json::json!({
+//         "bot_name": bot_name,
+//         "welcome": welcome,
+//         "system_prompt": system_prompt,
+//         "color": color,
+//     });
+ 
+//     let path = dirs::home_dir()
+//         .unwrap_or_default()
+//         .join(".mimona")
+//         .join("widget_settings.json");
+ 
+//     tokio::fs::create_dir_all(path.parent().unwrap()).await.ok();
+//     if let Ok(s) = serde_json::to_string_pretty(&settings) {
+//         tokio::fs::write(&path, s).await.ok();
+//     }
+ 
+//     let _ = tx.send(WorkerUpdate::StatusMessage("Widget settings saved".into()));
+// }
+ 
+// ── 
 
 async fn start_server_and_bridge(tx: UpdateSender) {
     // Start the Axum API server on a background task

@@ -4,10 +4,7 @@ use std::path::PathBuf;
 
 const BRIDGE_BASE: &str = "http://localhost:3344";
 
-/// Locates the whatsapp-bridge/ directory relative to the running binary,
-/// falling back to the current working directory for `cargo run` during
-/// development. Mirrors the same lookup pattern used for frontend/ in
-/// server/api.rs.
+
 fn bridge_dir() -> Option<PathBuf> {
     // Search multiple locations in order of preference
     let mut candidates = vec![];

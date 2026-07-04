@@ -7,6 +7,7 @@ pub mod panel_whatsapp;
 pub mod panel_automate;
 pub mod panel_animation;
 pub mod panel_website;
+pub mod panel_setup;
 pub mod panel_widget;
 
 pub use app::MimonaApp;

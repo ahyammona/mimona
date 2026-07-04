@@ -4,7 +4,12 @@ use tokio::sync::mpsc;
 
 use super::state::*;
 use super::worker;
-use super::{panel_animation, panel_chat, panel_models, panel_whatsapp,panel_automate, panel_website, panel_widget};
+use super::{
+    panel_animation, panel_chat, 
+    panel_models, panel_whatsapp,
+    panel_automate, panel_website,
+    panel_widget, panel_setup
+};
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum Panel {
@@ -148,6 +153,12 @@ impl MimonaApp {
                     st.status_message = Some(format!("Wallet error: {}", e));
                     st.wallet_loading = false;
                 }
+                WorkerUpdate::OllamaStatus(status) => {
+                    if status == OllamaStatus::Running {
+                        st.setup_dismissed = true;
+                    }
+                    st.ollama_status = status;
+                }
                 WorkerUpdate::ServerStarted(port) => {
                     st.server_port = port;
                 }
@@ -284,6 +295,23 @@ impl eframe::App for MimonaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.process_updates();
         self.poll_wa_if_needed();
+        {
+            let st = self.state.lock().unwrap();
+            if st.ollama_status == OllamaStatus::Checking {
+                drop(st);
+                let _ = self.cmd_tx.send(UiCommand::CheckOllama);
+            } else {
+                drop(st);
+            }
+        }
+         // Also handle DismissSetup command from setup panel
+        {
+            let mut st = self.state.lock().unwrap();
+            // DismissSetup is handled directly here
+            if st.ollama_status == OllamaStatus::Running {
+                st.setup_dismissed = true;
+            }
+        }
 
         {
             let st = self.state.lock().unwrap();
@@ -488,6 +516,16 @@ impl eframe::App for MimonaApp {
                 .fill(Color32::from_gray(245))
                 .inner_margin(Margin::same(0.0)))
             .show(ctx, |ui| {
+                 // Show setup screen until Ollama is confirmed running
+                let (ollama_ok, dismissed) = {
+                    let st = self.state.lock().unwrap();
+                    (st.ollama_status == OllamaStatus::Running, st.setup_dismissed)
+                };
+ 
+                if !ollama_ok && !dismissed {
+                    panel_setup::draw(ui, &self.state, &self.cmd_tx);
+                    return;
+                }
                 match self.active_panel {
                     Panel::Chat =>
                         panel_chat::draw(ui, &self.state, &self.cmd_tx),
