@@ -27,6 +27,12 @@ pub struct AppState {
       // ── Setup ────────────────────────────────────────────────────────────
     pub ollama_status: OllamaStatus,
     pub setup_dismissed: bool,
+    // Guards against re-sending CheckOllama on every single egui frame while
+    // a check is already in flight (this used to spawn a new subprocess
+    // check ~60x/second, which is what caused the flood of ollama.exe
+    // windows/crash dialogs). Cleared once the WorkerUpdate::OllamaStatus
+    // result comes back.
+    pub ollama_check_in_flight: bool,
 
     // ── Chat ────────────────────────────────────────────────────────────
     pub chat_history: Vec<ChatMessage>,

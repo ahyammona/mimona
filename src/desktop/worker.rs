@@ -199,7 +199,7 @@ async fn handle_check_ollama(tx: UpdateSender) {
         .build()
         .unwrap_or_default();
     
-    match client.get("http://localhost::11434/api/tags").send().await {
+    match client.get("http://localhost:11434/api/tags").send().await {
         Ok(r) if r.status().is_success() => {
             let _ = tx.send(WorkerUpdate::OllamaStatus(OllamaStatus::Running));
         }

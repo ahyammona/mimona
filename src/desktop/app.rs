@@ -158,6 +158,7 @@ impl MimonaApp {
                         st.setup_dismissed = true;
                     }
                     st.ollama_status = status;
+                    st.ollama_check_in_flight = false;
                 }
                 WorkerUpdate::ServerStarted(port) => {
                     st.server_port = port;
@@ -296,8 +297,14 @@ impl eframe::App for MimonaApp {
         self.process_updates();
         self.poll_wa_if_needed();
         {
-            let st = self.state.lock().unwrap();
-            if st.ollama_status == OllamaStatus::Checking {
+            let mut st = self.state.lock().unwrap();
+            // Only send CheckOllama once and wait for the result. Previously
+            // this fired on every repaint (dozens of times/sec) as long as
+            // status stayed `Checking`, and each one spawned a real
+            // subprocess to probe for the ollama binary — flooding the
+            // screen with ollama.exe windows/crash dialogs on Windows.
+            if st.ollama_status == OllamaStatus::Checking && !st.ollama_check_in_flight {
+                st.ollama_check_in_flight = true;
                 drop(st);
                 let _ = self.cmd_tx.send(UiCommand::CheckOllama);
             } else {

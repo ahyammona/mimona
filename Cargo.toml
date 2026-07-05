@@ -15,6 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 libc = "0.2"
+fs2 = "0.4"
 clap = { version = "4", features = ["derive", "color"] }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"

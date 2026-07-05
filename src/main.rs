@@ -91,27 +91,27 @@ fn main() -> Result<()> {
 
     // No args or explicit Desktop → launch GUI
     if matches!(cli.command, Some(Commands::Desktop) | None) {
-        // Single instance lock — prevent multiple windows opening
+        // Single instance lock — prevent multiple windows opening.
+        //
+        // NOTE: this used to rely on `std::mem::forget(file)` alone on Windows,
+        // which does NOT grant exclusive access — OpenOptions::open uses share
+        // flags that let other processes open the same file concurrently, so
+        // a second launch of mimona.exe was never actually blocked. `fs2`
+        // maps `try_lock_exclusive` to `flock` on Unix and `LockFileEx` on
+        // Windows, so this now really is exclusive on both platforms.
+        use fs2::FileExt;
+
         let lock_path = std::env::temp_dir().join("mimona.lock");
         if let Ok(file) = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
             .open(&lock_path)
         {
-            #[cfg(unix)]
-            {
-                use std::os::unix::io::AsRawFd;
-                let fd = file.as_raw_fd();
-                let ret = unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) };
-                if ret != 0 {
-                    return Ok(()); // another instance already running
-                }
-                std::mem::forget(file); // keep lock alive for process lifetime
+            if file.try_lock_exclusive().is_err() {
+                // Another instance is already running — exit quietly.
+                return Ok(());
             }
-            #[cfg(windows)]
-            {
-                std::mem::forget(file); // OS handles exclusive access on Windows
-            }
+            std::mem::forget(file); // keep the lock held for process lifetime
         }
 
         return launch_desktop();
