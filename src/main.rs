@@ -10,9 +10,10 @@ mod server;
 mod whatsapp;
 mod whatsapp_bridge_launcher;
 mod widget;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
- 
+
 #[derive(Parser)]
 #[command(
     name = "mimona",
@@ -23,11 +24,11 @@ use clap::{Parser, Subcommand};
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
- 
+
     #[arg(short, long, global = true)]
     verbose: bool,
 }
- 
+
 #[derive(Subcommand)]
 enum Commands {
     Run {
@@ -63,7 +64,7 @@ enum Commands {
         action: WalletCommands,
     },
 }
- 
+
 #[derive(Subcommand)]
 enum NodeCommands {
     Start,
@@ -71,64 +72,58 @@ enum NodeCommands {
     Status,
     Earnings,
 }
- 
+
 #[derive(Subcommand)]
 enum WalletCommands {
     Create,
     Balance,
     Address,
 }
- 
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
- 
+
     let log_level = if cli.verbose { "debug" } else { "warn" };
     tracing_subscriber::fmt()
         .with_env_filter(log_level)
         .with_target(false)
         .init();
- 
+
     // No args or explicit Desktop → launch GUI
     if matches!(cli.command, Some(Commands::Desktop) | None) {
-        // Single instance lock — prevent multiple windows
+        // Single instance lock — prevent multiple windows opening
         let lock_path = std::env::temp_dir().join("mimona.lock");
-        let lock = std::fs::OpenOptions::new()
+        if let Ok(file) = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
-            .open(&lock_path);
- 
-        if let Ok(file) = lock {
-            use std::io::Write;
-            // Try to get exclusive lock
+            .open(&lock_path)
+        {
             #[cfg(unix)]
             {
                 use std::os::unix::io::AsRawFd;
                 let fd = file.as_raw_fd();
                 let ret = unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) };
                 if ret != 0 {
-                    // Another instance is running — just exit silently
-                    return Ok(());
+                    return Ok(()); // another instance already running
                 }
-                // Keep file handle alive for the duration of the process
-                std::mem::forget(file);
+                std::mem::forget(file); // keep lock alive for process lifetime
             }
             #[cfg(windows)]
             {
-                // On Windows the OS handles exclusive file locking
-                std::mem::forget(file);
+                std::mem::forget(file); // OS handles exclusive access on Windows
             }
         }
- 
+
         return launch_desktop();
     }
- 
+
     // All other commands run inside a Tokio runtime
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
         .block_on(async_main(cli))
 }
- 
+
 fn launch_desktop() -> Result<()> {
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
@@ -149,7 +144,7 @@ fn launch_desktop() -> Result<()> {
     ).map_err(|e| anyhow::anyhow!("Desktop window error: {}", e))?;
     Ok(())
 }
- 
+
 async fn async_main(cli: Cli) -> Result<()> {
     match cli.command {
         None => unreachable!(),
@@ -186,4 +181,3 @@ async fn async_main(cli: Cli) -> Result<()> {
     }
     Ok(())
 }
- 
