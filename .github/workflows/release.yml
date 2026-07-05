@@ -13,7 +13,29 @@ permissions:
   contents: write
 
 jobs:
-  # ── Raw binary (for install.sh / manual download) ─────────────────────────
+  # ── Windows .exe ───────────────────────────────────────────────────────────
+  windows:
+    name: Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: Upload .exe to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: target/x86_64-pc-windows-msvc/release/mimona.exe
+          generate_release_notes: false
+
+  # ── Linux binary ───────────────────────────────────────────────────────────
   build:
     name: Build Linux binary
     runs-on: ubuntu-22.04
