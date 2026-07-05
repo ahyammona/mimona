@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Mimona
+Comment=Your local AI runtime
+Exec=/home/lord-mona/projects/desktop/mimona/target/release/mimona
+Icon=/home/lord-mona/projects/desktop/mimona/assets/icon.png
+Terminal=false
+Type=Application
+Categories=Utility;AI;
+StartupWMClass=mimona

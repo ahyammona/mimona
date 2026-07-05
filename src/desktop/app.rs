@@ -370,26 +370,26 @@ impl eframe::App for MimonaApp {
                             .size(12.0)
                             .color(Color32::GRAY),
                     );
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.add_space(16.0);
+                    // ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    //     ui.add_space(16.0);
 
-                        if ui.button(RichText::new("x").size(13.0).strong().color(Color32::from_gray(80))).clicked() {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                        }
-                        ui.add_space(4.0);
+                    //     if ui.button(RichText::new("x").size(13.0).strong().color(Color32::from_gray(80))).clicked() {
+                    //         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    //     }
+                    //     ui.add_space(4.0);
 
-                        let is_maximized = ctx.input(|i|i.viewport().maximized.unwrap_or(false));
-                        let max_icon = if is_maximized { "🗗" } else { "🗖" };
-                        if ui.button(RichText::new(max_icon).size(13.0).color(Color32::from_gray(80))).clicked() {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(!is_maximized));
-                        }
+                    //     let is_maximized = ctx.input(|i|i.viewport().maximized.unwrap_or(false));
+                    //     let max_icon = if is_maximized { "🗗" } else { "🗖" };
+                    //     if ui.button(RichText::new(max_icon).size(13.0).color(Color32::from_gray(80))).clicked() {
+                    //         ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(!is_maximized));
+                    //     }
 
-                        ui.add_space(4.0);
-                        if ui.button(RichText::new("🗕").size(13.0).color(Color32::from_gray(80))).clicked() {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
-                        }
+                    //     ui.add_space(4.0);
+                    //     if ui.button(RichText::new("🗕").size(13.0).color(Color32::from_gray(80))).clicked() {
+                    //         ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+                    //     }
 
-                    });
+                    // });
 
                 });
             });
