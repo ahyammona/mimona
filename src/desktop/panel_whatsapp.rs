@@ -31,6 +31,114 @@ fn draw_inner(ui: &mut Ui, state: &Arc<Mutex<AppState>>, cmd_tx: &CmdSender, _ct
     ui.label(RichText::new("WhatsApp").size(22.0).strong().color(Color32::BLACK));
     ui.add_space(16.0);
 
+    // Gate on the bridge status before showing the normal linking UI —
+    // previously the panel always rendered "Scan QR Code" regardless of
+    // whether the bridge was even reachable, so clicking it just produced
+    // a raw "Bridge unreachable: error sending request for url (...)"
+    // message. Now we check up front and explain what's actually wrong.
+    let bridge_status = st.bridge_status.clone();
+    match bridge_status {
+        crate::whatsapp_bridge_launcher::BridgeStatus::Running => {
+            // fall through to normal panel below
+        }
+        crate::whatsapp_bridge_launcher::BridgeStatus::Checking => {
+            drop(st);
+            card(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("Checking WhatsApp bridge…").size(13.5).color(Color32::GRAY));
+                });
+            });
+            return;
+        }
+        crate::whatsapp_bridge_launcher::BridgeStatus::Starting => {
+            drop(st);
+            card(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("Starting WhatsApp bridge (first run installs dependencies, this can take a minute)…").size(13.5).color(Color32::GRAY));
+                });
+            });
+            return;
+        }
+        crate::whatsapp_bridge_launcher::BridgeStatus::NotBundled => {
+            drop(st);
+            card(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("⚠").size(20.0).color(Color32::from_rgb(217, 119, 6)));
+                    ui.add_space(10.0);
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("WhatsApp bridge component not found").size(15.0).strong().color(Color32::from_rgb(146, 64, 14)));
+                        ui.add_space(2.0);
+                        ui.label(RichText::new(
+                            "Mimona's WhatsApp support ships as a separate download alongside the app. \
+                             Grab the assets bundle from the release page and unzip it next to Mimona \
+                             (or into ~/.mimona/whatsapp-bridge), then come back here."
+                        ).size(12.5).color(Color32::from_rgb(180, 100, 20)));
+                    });
+                });
+            });
+            ui.add_space(16.0);
+            ui.vertical_centered(|ui| {
+                let btn = egui::Button::new(
+                    RichText::new("⬇  Get WhatsApp Bridge").size(14.0).color(Color32::WHITE).strong()
+                )
+                .fill(Color32::BLACK)
+                .rounding(Rounding::same(10.0))
+                .min_size(Vec2::new(220.0, 44.0));
+
+                if ui.add(btn).clicked() {
+                    let _ = cmd_tx.send(UiCommand::OpenBrowser(
+                        "https://github.com/ahyammona/mimona/releases/latest".to_string(),
+                    ));
+                }
+
+                ui.add_space(12.0);
+                if ui.link(RichText::new("Check again").size(12.5)).clicked() {
+                    let _ = cmd_tx.send(UiCommand::CheckBridge);
+                }
+            });
+            return;
+        }
+        crate::whatsapp_bridge_launcher::BridgeStatus::NotRunning => {
+            drop(st);
+            card(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("ℹ").size(20.0).color(Color32::from_rgb(37, 99, 235)));
+                    ui.add_space(10.0);
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("WhatsApp bridge is installed but not running").size(15.0).strong().color(Color32::from_rgb(30, 64, 175)));
+                        ui.add_space(2.0);
+                        ui.label(RichText::new(
+                            "Click below to start it — first run may take a moment to install dependencies."
+                        ).size(12.5).color(Color32::from_rgb(30, 100, 200)));
+                    });
+                });
+            });
+            ui.add_space(16.0);
+            ui.vertical_centered(|ui| {
+                let btn = egui::Button::new(
+                    RichText::new("▶  Start Bridge").size(14.0).color(Color32::WHITE).strong()
+                )
+                .fill(Color32::BLACK)
+                .rounding(Rounding::same(10.0))
+                .min_size(Vec2::new(200.0, 44.0));
+
+                if ui.add(btn).clicked() {
+                    let _ = cmd_tx.send(UiCommand::StartBridge);
+                }
+
+                ui.add_space(12.0);
+                if ui.link(RichText::new("Check again").size(12.5)).clicked() {
+                    let _ = cmd_tx.send(UiCommand::CheckBridge);
+                }
+            });
+            return;
+        }
+    }
+
     let session_state = st.wa_session_state.clone();
     let selected_phone = st.wa_selected_phone.clone();
 

@@ -96,6 +96,21 @@ pub async fn run_worker(
                     handle_check_ollama(tx).await;
                 });
             }
+            UiCommand::CheckBridge => {
+                tokio::spawn(async move {
+                    let status = crate::whatsapp_bridge_launcher::check_status().await;
+                    let _ = tx.send(WorkerUpdate::BridgeStatus(status));
+                });
+            }
+            UiCommand::StartBridge => {
+                let _ = tx.send(WorkerUpdate::BridgeStatus(
+                    crate::whatsapp_bridge_launcher::BridgeStatus::Starting,
+                ));
+                tokio::spawn(async move {
+                    let status = crate::whatsapp_bridge_launcher::start_bridge_and_wait().await;
+                    let _ = tx.send(WorkerUpdate::BridgeStatus(status));
+                });
+            }
             UiCommand::InstallOllama => {
                 // Open download page in browser
                 let url = if cfg!(target_os = "windows") {
@@ -546,6 +561,18 @@ async fn handle_delete_model(name: String, tx: UpdateSender) {
 // ── WhatsApp ──────────────────────────────────────────────────────────────────
 
 async fn handle_wa_start_session(tx: UpdateSender) {
+    // Check first instead of letting a raw "connection refused" surface —
+    // this is what previously showed as "Bridge unreachable: error sending
+    // request for url (http://localhost:3344/baileys/start)" with no
+    // indication of what to actually do about it.
+    match crate::whatsapp_bridge_launcher::check_status().await {
+        crate::whatsapp_bridge_launcher::BridgeStatus::Running => {}
+        status => {
+            let _ = tx.send(WorkerUpdate::BridgeStatus(status));
+            return;
+        }
+    }
+
     let client = reqwest::Client::new();
     match client
         .post(format!("{}/baileys/start", BRIDGE_API))

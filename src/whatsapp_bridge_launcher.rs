@@ -4,6 +4,42 @@ use std::path::PathBuf;
 
 const BRIDGE_BASE: &str = "http://localhost:3344";
 
+/// Mirrors the pattern used for `OllamaStatus` in the desktop app: instead
+/// of letting a raw "connection refused" bubble up to the WhatsApp panel,
+/// the GUI can check this and show an actionable message (download the
+/// bundle / start it / wait for it to come up).
+#[derive(Clone, Debug, PartialEq, Default)]
+pub enum BridgeStatus {
+    #[default]
+    Checking,
+    /// The `whatsapp-bridge` folder wasn't found in any known location —
+    /// this happens on Windows installs that only downloaded `mimona.exe`,
+    /// since the bridge ships as a separate assets bundle.
+    NotBundled,
+    /// The folder exists but nothing answered on port 3344 yet.
+    NotRunning,
+    Starting,
+    Running,
+}
+
+/// Cheap check used by the GUI (does not attempt to install/spawn anything).
+pub async fn check_status() -> BridgeStatus {
+    if ping_bridge().await {
+        return BridgeStatus::Running;
+    }
+    if bridge_dir().is_none() {
+        return BridgeStatus::NotBundled;
+    }
+    BridgeStatus::NotRunning
+}
+
+/// Used by the GUI's "Start Bridge" button — runs the same install/spawn
+/// logic as the automatic CLI startup, then reports the resulting status.
+pub async fn start_bridge_and_wait() -> BridgeStatus {
+    ensure_bridge_running().await;
+    check_status().await
+}
+
 
 fn bridge_dir() -> Option<PathBuf> {
     // Search multiple locations in order of preference

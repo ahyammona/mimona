@@ -160,6 +160,10 @@ impl MimonaApp {
                     st.ollama_status = status;
                     st.ollama_check_in_flight = false;
                 }
+                WorkerUpdate::BridgeStatus(status) => {
+                    st.bridge_status = status;
+                    st.bridge_check_in_flight = false;
+                }
                 WorkerUpdate::ServerStarted(port) => {
                     st.server_port = port;
                 }
@@ -508,7 +512,10 @@ impl eframe::App for MimonaApp {
             self.active_panel = *panel;
             match panel {   
                 Panel::Models   => { let _ = self.cmd_tx.send(UiCommand::RefreshModels); }
-                Panel::WhatsApp => { let _ = self.cmd_tx.send(UiCommand::RefreshWaUsers); }
+                Panel::WhatsApp => {
+                    let _ = self.cmd_tx.send(UiCommand::RefreshWaUsers);
+                    let _ = self.cmd_tx.send(UiCommand::CheckBridge);
+                }
                     _ => {}
                 }
             }

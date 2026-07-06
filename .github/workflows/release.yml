@@ -28,11 +28,39 @@ jobs:
       - name: Build
         run: cargo build --release --target x86_64-pc-windows-msvc
 
-      - name: Upload .exe to release
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Previously only mimona.exe was uploaded, and the whatsapp-bridge
+      # folder shipped as a separate mimona-assets.zip in the "bundle" job
+      # below. Nothing pointed Windows users at that second download, so
+      # WhatsApp support silently failed for anyone who just grabbed the
+      # .exe ("Bridge unreachable: error sending request for url
+      # (http://localhost:3344/baileys/start)"). Bundle it directly here
+      # instead, next to the exe, so `bridge_dir()` finds it automatically.
+      - name: Install bridge dependencies
+        run: |
+          cd whatsapp-bridge
+          npm install --ignore-scripts
+
+      - name: Assemble Windows package
+        shell: bash
+        run: |
+          mkdir -p mimona-windows
+          cp target/x86_64-pc-windows-msvc/release/mimona.exe mimona-windows/
+          cp -r whatsapp-bridge mimona-windows/whatsapp-bridge
+          rm -rf mimona-windows/whatsapp-bridge/auth_sessions
+          rm -f  mimona-windows/whatsapp-bridge/.env
+          cp -r frontend mimona-windows/frontend
+          cp registry.json mimona-windows/
+          cd mimona-windows && zip -r ../mimona-windows.zip .
+
+      - name: Upload Windows package to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: target/x86_64-pc-windows-msvc/release/mimona.exe
+          files: mimona-windows.zip
           generate_release_notes: false
 
   # ── Linux binary ───────────────────────────────────────────────────────────

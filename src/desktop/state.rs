@@ -54,6 +54,10 @@ pub struct AppState {
     pub wa_selected_phone: Option<String>,
     pub wa_prompt_input: String,
     pub wa_prompt_saved: bool,
+    pub bridge_status: crate::whatsapp_bridge_launcher::BridgeStatus,
+    // Guards CheckBridge the same way ollama_check_in_flight guards
+    // CheckOllama — avoids spamming a check every frame.
+    pub bridge_check_in_flight: bool,
 
     // ── Automate ───────────────────────────────────────────────────────────
     pub auto_tab: AutomateTab,
@@ -147,6 +151,9 @@ pub enum UiCommand {
     InstallOllama,
     StartOllama,
     DismissSetup,
+    // WhatsApp bridge setup (mirrors the Ollama setup flow above)
+    CheckBridge,
+    StartBridge,
     // Chat
     SendMessage { model: String, messages: Vec<(String, String)>, system: String },
 
@@ -207,6 +214,7 @@ pub enum UiCommand {
 /// Updates the async worker sends back to the UI.
 pub enum WorkerUpdate {
     OllamaStatus(OllamaStatus),
+    BridgeStatus(crate::whatsapp_bridge_launcher::BridgeStatus),
 
     // Chat
     ChatToken(String),
