@@ -9,5 +9,5 @@ pub mod panel_animation;
 pub mod panel_website;
 pub mod panel_setup;
 pub mod panel_widget;
-
+pub mod panel_promote;
 pub use app::MimonaApp;

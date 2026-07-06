@@ -113,6 +113,22 @@ pub struct AppState {
     // ── Global ───────────────────────────────────────────────────────────
     pub status_message: Option<String>,
     pub server_port: u16,
+    // ── Promote ──────────────────────────────────────────────────────────
+    pub promote_platform: PromotePlatform,
+    pub promote_product: String,
+    pub promote_benefits: String,
+    pub promote_cta: String,
+    pub promote_tone: String,
+    pub promote_disclose: bool,
+    pub promote_tg_token: String,
+    pub promote_tg_channels: String,
+    pub promote_reddit_client_id: String,
+    pub promote_reddit_secret: String,
+    pub promote_reddit_username: String,
+    pub promote_reddit_password: String,
+    pub promote_reddit_subs: String,
+    pub promote_loading: bool,
+    pub promote_result: String,
 }
 
 #[derive(Clone, Debug)]
@@ -175,7 +191,21 @@ pub enum UiCommand {
     GenerateSocialContent { brand: String, topic: String, platforms: String, model: String },
     GenerateColdEmails { product: String, audience: String, count: u32, model: String },
     GenerateSeoContent { business: String, location: String, keywords: String, model: String },
- 
+    RunPromotion {
+     platform: PromotePlatform,
+     product: String,
+     benefits: String,
+     cta: String,
+     tone: String,
+     model: String,
+     tg_token: String,
+     tg_channels: Vec<String>,
+     reddit_client_id: String,
+     reddit_secret: String,
+     reddit_username: String,
+     reddit_password: String,
+     reddit_subs: Vec<String>,
+    },
 
     // Animation
     GenerateAnimation(String),
@@ -240,6 +270,10 @@ pub enum WorkerUpdate {
     // Automate
     AutomateDone { tool: String, result: String },
     AutomateError { tool: String, error: String },
+    
+    // Promote
+    PromotionDone(String),
+    PromotionError(String),
 
     // Animation
     AnimCodeGenerated(String),
@@ -278,6 +312,13 @@ pub enum AutomateTab {
     Social,
     Email,
     Seo,
+}
+#[derive(Clone, Debug, PartialEq, Default)]
+pub enum PromotePlatform {
+    #[default]
+    Telegram,
+    Reddit,
+    Both,
 }
  
 

@@ -8,7 +8,7 @@ use super::{
     panel_animation, panel_chat, 
     panel_models, panel_whatsapp,
     panel_automate, panel_website,
-    panel_widget, panel_setup
+    panel_widget, panel_setup, panel_promote
 };
 
 #[derive(PartialEq, Clone, Copy)]
@@ -20,6 +20,7 @@ pub enum Panel {
     Automate,
     Website,
     Widget,
+    Promote,
 }
 
 pub struct MimonaApp {
@@ -47,6 +48,7 @@ impl MimonaApp {
             chat_model: String::new(),
             wa_session_state: "idle".to_string(),
             server_port: 11435,
+            promote_tone: "Casual".to_string(),
             ..Default::default()
         }));
 
@@ -220,7 +222,14 @@ impl MimonaApp {
                         _ => {}
                     }
                 }
-            
+                WorkerUpdate::PromotionDone(result) => {
+                   st.promote_result = result;
+                   st.promote_loading = false;
+                }
+                WorkerUpdate::PromotionError(e) => {
+                    st.promote_result = format!("Error: {}", e);
+                    st.promote_loading = false;
+                }
                 WorkerUpdate::WebsiteGenerated(html) => {
                     st.web_generated_html = html;
                     st.web_status = WebsiteStatus::Generated;
@@ -465,6 +474,7 @@ impl eframe::App for MimonaApp {
                     (Panel::WhatsApp,  "whatsapp",  "WhatsApp"),
                     (Panel::Automate,  "automate",  "Automate"),
                     (Panel::Models,    "models",    "Models"),
+                    (Panel::Promote, "promote", "Promote"),
                     (Panel::Animation, "animation", "Animation"),
                     (Panel::Website,   "website",   "Website"),
                     (Panel::Widget,    "widget",    "Widget"),
@@ -481,6 +491,7 @@ impl eframe::App for MimonaApp {
                       Panel::Website   => "🌐",
                       Panel::Automate  => "⚡",
                       Panel::Widget    => "🔌",
+                      Panel::Promote => "📣",
                  };
 
                let (bg, text_color) = if selected {
@@ -572,6 +583,8 @@ impl eframe::App for MimonaApp {
                         panel_website::draw(ui, &self.state, &self.cmd_tx),
                     Panel::Widget =>
                         panel_widget::draw(ui, &self.state, &self.cmd_tx),
+                    Panel::Promote =>
+                        panel_promote::draw(ui, &self.state, &self.cmd_tx),
                 }
             });
     }

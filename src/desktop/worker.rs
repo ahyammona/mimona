@@ -56,6 +56,20 @@ pub async fn run_worker(
                     handle_wa_start_session(tx).await;
                 });
             }
+            UiCommand::RunPromotion {
+                platform, product, benefits, cta, tone, model,
+                tg_token, tg_channels,
+                reddit_client_id, reddit_secret, reddit_username, reddit_password, reddit_subs,
+            } => {
+                tokio::spawn(async move {
+                handle_run_promotion(
+                platform, product, benefits, cta, tone, model,
+                tg_token, tg_channels,
+                reddit_client_id, reddit_secret, reddit_username, reddit_password, reddit_subs,
+                tx,
+                    ).await;
+                });
+            }
             UiCommand::PollWaStatus(session_id) => {
                 tokio::spawn(async move {
                     poll_wa_status(&session_id, tx).await;
@@ -268,7 +282,129 @@ async fn handle_start_ollama(tx: UpdateSender) {
  
     let _ = tx.send(WorkerUpdate::OllamaStatus(OllamaStatus::NotRunning));
 }
+async fn handle_run_promotion(
+    platform: PromotePlatform,
+    product: String,
+    benefits: String,
+    cta: String,
+    tone: String,
+    model: String,
+    tg_token: String,
+    tg_channels: Vec<String>,
+    reddit_client_id: String,
+    reddit_secret: String,
+    reddit_username: String,
+    reddit_password: String,
+    reddit_subs: Vec<String>,
+    tx: UpdateSender,
+) {
+    // 1. Generate the disclosed promotional copy once, reuse per target.
+    let prompt = format!(
+        r#"Write a single {tone} promotional post disclosing it as sponsored/promotional content.
+Product/Service: {product}
+Key benefits: {benefits}
+Call to action: {cta}
 
+Requirements:
+- Start or clearly mark the post as promotional/sponsored (e.g. "Sponsored:" or similar), do not disguise it as organic content.
+- Keep it under 300 words.
+- Output only the post text, no commentary."#
+    );
+
+    let post_text = match ollama_generate_text(&model, &prompt).await {
+        Ok(t) => t,
+        Err(e) => {
+            let _ = tx.send(WorkerUpdate::PromotionError(format!("Copy generation failed: {e}")));
+            return;
+        }
+    };
+
+    let mut results: Vec<String> = Vec::new();
+    let mut had_error = false;
+
+    if matches!(platform, PromotePlatform::Telegram | PromotePlatform::Both) {
+        for chat_id in &tg_channels {
+            match post_to_telegram(&tg_token, chat_id, &post_text).await {
+                Ok(_) => results.push(format!("✅ Telegram {chat_id}: posted")),
+                Err(e) => { had_error = true; results.push(format!("❌ Telegram {chat_id}: {e}")); }
+            }
+        }
+    }
+
+    if matches!(platform, PromotePlatform::Reddit | PromotePlatform::Both) {
+        match reddit_oauth_token(&reddit_client_id, &reddit_secret, &reddit_username, &reddit_password).await {
+            Ok(token) => {
+                for sub in &reddit_subs {
+                    match post_to_reddit(&token, sub, &product, &post_text).await {
+                        Ok(_) => results.push(format!("✅ r/{sub}: posted")),
+                        Err(e) => { had_error = true; results.push(format!("❌ r/{sub}: {e}")); }
+                    }
+                }
+            }
+            Err(e) => { had_error = true; results.push(format!("❌ Reddit auth failed: {e}")); }
+        }
+    }
+
+    let summary = results.join("\n");
+    if had_error {
+        let _ = tx.send(WorkerUpdate::PromotionError(summary));
+    } else {
+        let _ = tx.send(WorkerUpdate::PromotionDone(summary));
+    }
+}
+
+async fn post_to_telegram(token: &str, chat_id: &str, text: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("https://api.telegram.org/bot{token}/sendMessage");
+    let resp = client
+        .post(&url)
+        .json(&serde_json::json!({ "chat_id": chat_id, "text": text }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(resp.text().await.unwrap_or_default());
+    }
+    Ok(())
+}
+
+async fn reddit_oauth_token(client_id: &str, secret: &str, username: &str, password: &str) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("https://www.reddit.com/api/v1/access_token")
+        .basic_auth(client_id, Some(secret))
+        .header("User-Agent", "mimona-promote/0.1")
+        .form(&[("grant_type", "password"), ("username", username), ("password", password)])
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(resp.text().await.unwrap_or_default());
+    }
+    let val: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    val["access_token"].as_str().map(|s| s.to_string()).ok_or_else(|| "no access_token in response".into())
+}
+
+async fn post_to_reddit(token: &str, subreddit: &str, title: &str, body: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("https://oauth.reddit.com/api/submit")
+        .bearer_auth(token)
+        .header("User-Agent", "mimona-promote/0.1")
+        .form(&[
+            ("sr", subreddit),
+            ("kind", "self"),
+            ("title", title),
+            ("text", body),
+        ])
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(resp.text().await.unwrap_or_default());
+    }
+    Ok(())
+}
 
 // async fn handle_save_widget_settings(
 //     bot_name: String,

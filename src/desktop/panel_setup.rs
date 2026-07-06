@@ -9,7 +9,11 @@ pub fn draw(ui: &mut Ui, state: &Arc<Mutex<AppState>>, cmd_tx: &CmdSender) {
     let status = st.ollama_status.clone();
     drop(st);
 
-    // Full screen centered layout
+    // Full screen centered layout. Wrapped in a ScrollArea — previously
+    // this content could overflow a smaller window with no way to reach
+    // the Install/Start button below it (it was the last thing rendered,
+    // after a full explainer card, with nothing to scroll).
+    egui::ScrollArea::vertical().show(ui, |ui| {
     ui.centered_and_justified(|ui| {
         ui.vertical_centered(|ui| {
             ui.set_max_width(480.0);
@@ -57,6 +61,7 @@ pub fn draw(ui: &mut Ui, state: &Arc<Mutex<AppState>>, cmd_tx: &CmdSender) {
                 }
             }
         });
+    });
     });
 }
 
@@ -106,7 +111,41 @@ fn draw_not_installed(ui: &mut Ui, cmd_tx: &CmdSender) {
 
     ui.add_space(20.0);
 
-    // What is Ollama
+    // Install button — moved up front, right after the status card, so
+    // it's immediately visible/reachable instead of being the last thing
+    // rendered after a full "What is Ollama?" explainer card.
+    ui.vertical_centered(|ui| {
+        let btn = egui::Button::new(
+            RichText::new("⬇  Install Ollama").size(15.0).color(Color32::WHITE).strong()
+        )
+        .fill(Color32::BLACK)
+        .rounding(Rounding::same(10.0))
+        .min_size(Vec2::new(220.0, 48.0));
+
+        if ui.add(btn).clicked() {
+            let _ = cmd_tx.send(UiCommand::InstallOllama);
+        }
+
+        ui.add_space(10.0);
+        ui.label(
+            RichText::new("Opens ollama.com/download in your browser")
+                .size(11.5).color(Color32::GRAY),
+        );
+
+        ui.add_space(10.0);
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Already installed?").size(12.5).color(Color32::GRAY));
+            ui.add_space(6.0);
+            if ui.link(RichText::new("Check again").size(12.5)).clicked() {
+                let _ = cmd_tx.send(UiCommand::CheckOllama);
+            }
+        });
+    });
+
+    ui.add_space(20.0);
+
+    // What is Ollama — kept as secondary/supplementary info below the
+    // action, for anyone who wants context, but no longer gates the button.
     egui::Frame::none()
         .fill(Color32::WHITE)
         .rounding(Rounding::same(12.0))
@@ -136,7 +175,7 @@ fn draw_not_installed(ui: &mut Ui, cmd_tx: &CmdSender) {
 
             // Install steps
             let steps = [
-                ("1", "Click Install Ollama below"),
+                ("1", "Click Install Ollama above"),
                 ("2", "Run the installer that downloads"),
                 ("3", "Come back here — Mimona will detect it automatically"),
             ];
@@ -154,40 +193,7 @@ fn draw_not_installed(ui: &mut Ui, cmd_tx: &CmdSender) {
                 });
                 ui.add_space(8.0);
             }
-
-            ui.add_space(8.0);
-
-            // Install button
-            ui.vertical_centered(|ui| {
-                let btn = egui::Button::new(
-                    RichText::new("⬇  Install Ollama").size(14.0).color(Color32::WHITE).strong()
-                )
-                .fill(Color32::BLACK)
-                .rounding(Rounding::same(10.0))
-                .min_size(Vec2::new(200.0, 44.0));
-
-                if ui.add(btn).clicked() {
-                    let _ = cmd_tx.send(UiCommand::InstallOllama);
-                }
-
-                ui.add_space(10.0);
-                ui.label(
-                    RichText::new("Opens ollama.com/download in your browser")
-                        .size(11.5).color(Color32::GRAY),
-                );
-            });
         });
-
-    ui.add_space(16.0);
-
-    // Already installed? Re-check
-    ui.horizontal_centered(|ui| {
-        ui.label(RichText::new("Already installed?").size(12.5).color(Color32::GRAY));
-        ui.add_space(6.0);
-        if ui.link(RichText::new("Check again").size(12.5)).clicked() {
-            let _ = cmd_tx.send(UiCommand::CheckOllama);
-        }
-    });
 }
 
 fn draw_not_running(ui: &mut Ui, cmd_tx: &CmdSender) {
