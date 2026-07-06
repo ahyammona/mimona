@@ -154,11 +154,28 @@ impl MimonaApp {
                     st.wallet_loading = false;
                 }
                 WorkerUpdate::OllamaStatus(status) => {
+                    let just_became_running =
+                        status == OllamaStatus::Running && st.ollama_status != OllamaStatus::Running;
                     if status == OllamaStatus::Running {
                         st.setup_dismissed = true;
                     }
                     st.ollama_status = status;
                     st.ollama_check_in_flight = false;
+
+                    // Previously `local_models` (and therefore the Chat
+                    // header's "No models" label, and the initial
+                    // `chat_model` selection) only got populated once the
+                    // user visited the Models tab and triggered
+                    // `RefreshModels` — since Chat is the default landing
+                    // panel, that meant sending a chat message could go out
+                    // with an empty model string, and the header would
+                    // keep saying "No models" even after a real reply came
+                    // back. Fetch the list proactively the moment Ollama is
+                    // confirmed running.
+                    if just_became_running && st.local_models.is_empty() && !st.models_loading {
+                        st.models_loading = true;
+                        let _ = self.cmd_tx.send(UiCommand::RefreshModels);
+                    }
                 }
                 WorkerUpdate::BridgeStatus(status) => {
                     st.bridge_status = status;
