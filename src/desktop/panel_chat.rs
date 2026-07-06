@@ -10,7 +10,7 @@ pub fn draw(ui: &mut Ui, state: &Arc<Mutex<AppState>>, cmd_tx: &CmdSender) {
     // the window may not have reported a real size yet, which can hand us a
     // degenerate or non-finite rect. Fall back to a sane default so the manual
     // arithmetic below can't produce NaN and crash egui's layout code.
-    //
+    // this would work.
     if !available.width().is_finite() || available.width() < 1.0
         || !available.height().is_finite() || available.height() < 1.0
     {
