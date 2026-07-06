@@ -56,6 +56,19 @@ jobs:
           Copy-Item registry.json mimona-windows/
           Compress-Archive -Path mimona-windows/* -DestinationPath mimona-windows.zip
 
+      - name: Remove stale mimona.exe asset from this release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          # Older workflow runs on this same tag uploaded a bare mimona.exe.
+          # Since we now upload mimona-windows.zip instead (a different
+          # filename), gh release upload won't overwrite/remove that old
+          # asset automatically — delete it explicitly if present so it
+          # can't be mistaken for the current build.
+          gh release delete-asset "$TAG" "mimona.exe" --repo "${{ github.repository }}" --yes || true
+
       - name: Upload Windows package to release
         uses: softprops/action-gh-release@v2
         with:
